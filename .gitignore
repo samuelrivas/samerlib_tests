@@ -1,0 +1,8 @@
+*~
+src/temp
+*.beam
+current_counterexample.eqc
+doc/*.html
+doc/edoc-info
+doc/erlang.png
+doc/*.css

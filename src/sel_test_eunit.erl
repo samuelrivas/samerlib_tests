@@ -66,3 +66,10 @@ dir_is_cleaned_up_test_() ->
                    end,
              filelib:is_file(Dir)
          end)].
+
+%% Simply launching parallel tests in different process must trigger the
+%% mechanism to avoid collisions, as the processes will all start with the same
+%% seed, thus generating the same sequence of random directory names.
+can_repeat_test_in_dir_test_() ->
+    T = {spawn, ?_test(sel_test:test_in_dir(fun(_) -> true end))},
+    {inparallel, lists:duplicate(10, T)}.

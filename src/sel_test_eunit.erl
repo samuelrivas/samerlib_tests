@@ -32,9 +32,20 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+%%--------------------------------------------------------------------
+%% test_in_dir tests
+%%--------------------------------------------------------------------
 dir_exists_test_() ->
     ?_assertMatch(
        true, sel_test:test_in_dir(fun(Dir) -> filelib:is_dir(Dir) end)).
+
+lets_exceptions_trhough_test_() ->
+    [?_assertThrow(
+        ouch, sel_test:test_in_dir(fun(_) -> throw(ouch) end))
+     ,?_assertExit(
+         ouch, sel_test:test_in_dir(fun(_) -> exit(ouch) end))
+     ,?_assertError(
+         ouch, sel_test:test_in_dir(fun(_) -> erlang:error(ouch) end))].
 
 dir_is_cleaned_up_test_() ->
     [?_assertMatch(

@@ -55,6 +55,15 @@ dir_is_cleaned_up_test_() ->
             filelib:is_file(Dir)
         end)
      ,?_assertMatch(
+        true,
+        begin
+            Dir = sel_test:test_in_dir(false, fun(D) -> D end),
+            Result = filelib:is_file(Dir),
+            sel_file:delete_recursive(Dir),
+            Result
+        end)
+
+     ,?_assertMatch(
          false,
          begin
              Dir = sel_test:test_in_dir(

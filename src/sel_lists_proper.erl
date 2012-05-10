@@ -62,20 +62,23 @@ prop_keysearch_neg() ->
                   proper:equals(Key, key(Tuple))
           end)).
 
-%% XXX There is a bug in proper that enables valid_tuple to return {} in some
-%% situations
 external_tuple(L) ->
-    ?SUCHTHAT(
-       T, valid_tuple(),
-       T /= {} andalso not lists:keymember(key(T), 1, L)).
+    ?SUCHTHAT(T, small_tuple(), not lists:keymember(key(T), 1, L)).
 
 %%%-------------------------------------------------------------------
 %%% Generators
 %%%-------------------------------------------------------------------
 tuple_list() ->
-    ?LET(L, proper_types:list(valid_tuple()), filter_duplicated_keys(L)).
+    ?LET(L, proper_types:list(small_tuple()), filter_duplicated_keys(L)).
 
-valid_tuple() -> ?SUCHTHAT(T, proper_types:tuple(), T /= {}).
+%% proper_types:tuple() generates huge tuples and has the risk of depleting the
+%% atom table (probably due to a bug). The type of the tuple is not really
+%% relevant, and for the size only a representation of some common sizes is
+%% enough to have pretty strong tests.
+small_tuple() ->
+    Int = proper_types:integer(),
+    proper_types:union([{Int}, {Int, Int}, {Int, Int, Int}]).
+
 
 filter_duplicated_keys([]) ->
     [];
@@ -85,4 +88,4 @@ filter_duplicated_keys([H | T]) ->
 %% lists:keydelete removes only the first instance
 keydelete(Key, List) -> [Tuple || Tuple <- List, Key /= key(Tuple)].
 
-key(Tuple) when Tuple /= {} -> element(1, Tuple).
+key(Tuple) -> element(1, Tuple).

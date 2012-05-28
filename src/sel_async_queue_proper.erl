@@ -33,7 +33,9 @@
 
 %%% We are using the same internal state as learnerl, but that must be opaque
 %%% for any other non-testing use of learnerl
--record(state, {queue :: sel_async_queue:async_queue()}).
+-record(state, {queue     :: sel_async_queue:async_queue(),
+                collector :: pid(),
+                pushed    :: [integer()]}).
 
 %%% FSM Callbacks
 -export([initial_state/0, initial_state_data/0, weight/3, precondition/4,
@@ -49,6 +51,18 @@
 -export([collector/1]).
 
 %%%===================================================================
+%%% States
+%%%===================================================================
+uninitialised(_) ->
+    [{initialised, {call, sel_async_queue, new, []}}].
+
+initialised(#state{queue = Queue}) ->
+    [{history,
+      {call, sel_async_queue, push, [Queue, proper_types:integer()]}}
+     , {history,
+        {call, ?MODULE, pop, [{var, collector}, Queue]}}].
+
+%%%===================================================================
 %%% FSM Callbacks
 %%%===================================================================
 initial_state() -> uninitialised.
@@ -60,29 +74,28 @@ weight(_,_,_) -> 1.
 precondition(_,_,_,_) -> true.
 
 postcondition(_From, _Target, _StateData, {call, _, push, _}, ok  ) -> true;
-postcondition(_From, _Target, _StateData, {call, _, pop,  _}, _Res) -> true;
+postcondition(
+  _From, _Target, StateData, {call, _, pop, [Collector, _Queue]}, _Res) ->
+    case StateData#state.pushed of
+        [] ->
+            %% Here we are blocked waiting for pushes, nothing to check
+            true;
+        L ->
+            L =:= get_collected_elements(Collector)
+    end;
 postcondition(_From, _Target, _StateData, {call, _, new,  _}, _Res) -> true;
 
 %% Fall through to false to avoid false positives due to matching errors
 postcondition(_From, _Target, _StateData, _Call, _Res) ->
     false.
 
-next_state_data(_From, initialised, State, _Call, Queue) ->
+next_state_data(_From, _To, State, Queue, {call, _, new, _}) ->
     State#state{queue = Queue};
 
-next_state_data(_From, _Target, State, _Call, _Res) -> State.
+next_state_data(_From, _To, State, _Res, {call, _, push, What}) ->
+    State#state{pushed = [What | State#state.pushed]};
 
-%%%===================================================================
-%%% States
-%%%===================================================================
-uninitialised(_) ->
-    [{initialised, {call, sel_async_queue, new, []}}].
-
-initialised(#state{queue = Queue}) ->
-    [{history,
-      {call, sel_async_queue, push, [Queue, proper_types:integer()]}}
-     , {history,
-        {call, ?MODULE, pop, [{var, collector}, Queue]}}].
+next_state_data(_From, _Target, State, _Res, _Call) -> State.
 
 %%%===================================================================
 %%% Generators
@@ -118,6 +131,12 @@ report_error(H, S, R) ->
 start_collector() ->
     spawn_link(fun collector/0).
 
+get_collected_elements(Collector) ->
+    Collector ! {get_collected, self()},
+    receive
+        {collected, L} -> L
+    end.
+
 collector() ->
     collector([]).
 
@@ -126,5 +145,8 @@ collector(L) ->
         {pop, Queue} ->
             Val = sel_async_queue:pop(Queue),
             ?MODULE:collector([Val | L]);
-        stop -> ok
+        {get_collected, Pid} ->
+            Pid ! {collected, L};
+        stop ->
+            ok
     end.

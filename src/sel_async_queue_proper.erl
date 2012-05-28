@@ -135,6 +135,7 @@ get_collected_elements(Collector) ->
     Collector ! {get_collected, self()},
     receive
         {collected, L} -> L
+    after 100 -> erlang:error(timeout)
     end.
 
 collector() ->

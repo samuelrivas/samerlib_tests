@@ -57,10 +57,12 @@ uninitialised(_) ->
     [{initialised, {call, sel_async_queue, new, []}}].
 
 initialised(#state{queue = Queue}) ->
-    [{history,
+    [
+     {history,
       {call, sel_async_queue, push, [Queue, proper_types:integer()]}}
      , {history,
-        {call, ?MODULE, pop, [{var, collector}, Queue]}}].
+        {call, ?MODULE, pop, [{var, collector}, Queue]}}
+    ].
 
 %%%===================================================================
 %%% FSM Callbacks

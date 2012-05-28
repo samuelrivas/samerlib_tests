@@ -43,7 +43,10 @@
 -export([uninitialised/1, initialised/1]).
 
 %%% Transitions
--export([]).
+-export([pop/2]).
+
+%%% Internal processes
+-export([collector/1]).
 
 %%%===================================================================
 %%% FSM Callbacks
@@ -57,6 +60,7 @@ weight(_,_,_) -> 1.
 precondition(_,_,_,_) -> true.
 
 postcondition(_From, _Target, _StateData, {call, _, push, _}, ok  ) -> true;
+postcondition(_From, _Target, _StateData, {call, _, pop,  _}, _Res) -> true;
 postcondition(_From, _Target, _StateData, {call, _, new,  _}, _Res) -> true;
 
 %% Fall through to false to avoid false positives due to matching errors
@@ -74,9 +78,11 @@ next_state_data(_From, _Target, State, _Call, _Res) -> State.
 uninitialised(_) ->
     [{initialised, {call, sel_async_queue, new, []}}].
 
-initialised(_) ->
-    [{initialised,
-      {call, sel_async_queue, push, [queue, proper_types:integer()]}}].
+initialised(#state{queue = Queue}) ->
+    [{history,
+      {call, sel_async_queue, push, [Queue, proper_types:integer()]}}
+     , {history,
+        {call, ?MODULE, pop, [{var, collector}, Queue]}}].
 
 %%%===================================================================
 %%% Generators
@@ -85,6 +91,7 @@ initialised(_) ->
 %%%===================================================================
 %%% Transitions
 %%%===================================================================
+pop(Collector, Queue) -> Collector ! {pop, Queue}.
 
 %%%===================================================================
 %%% Properties
@@ -94,7 +101,11 @@ prop_learnerl_fsm() ->
        Cmds, proper_fsm:commands(?MODULE),
        ?TRAPEXIT(
           begin
-              {H, S, R} = proper_fsm:run_commands(?MODULE, Cmds),
+              Collector = start_collector(),
+              {H, S, R} =
+                  proper_fsm:run_commands(
+                    ?MODULE, Cmds, [{collector, Collector}]),
+              Collector ! stop,
               ?WHENFAIL(report_error(H, S, R), R =:= ok)
           end)).
 
@@ -103,3 +114,17 @@ prop_learnerl_fsm() ->
 %%%===================================================================
 report_error(H, S, R) ->
     io:format("History: ~p\nState: ~p\nRes: ~p\n",[H,S,R]).
+
+start_collector() ->
+    spawn_link(fun collector/0).
+
+collector() ->
+    collector([]).
+
+collector(L) ->
+    receive
+        {pop, Queue} ->
+            Val = sel_async_queue:pop(Queue),
+            ?MODULE:collector([Val | L]);
+        stop -> ok
+    end.

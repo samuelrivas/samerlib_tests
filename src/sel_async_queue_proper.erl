@@ -29,38 +29,51 @@
 -define(PROPER_NO_IMPORTS, true).
 -include_lib("proper/include/proper.hrl").
 
-commands() ->
-    ?LET(
-       Pushes, pushes(),
-       permutation(Pushes ++ lists:duplicate(length(Pushes), pop))).
+-export([prop_sequencing/0]).
 
-permutation([]) -> [];
-permutation(L) ->
-    ?LET(E, proper_types:elements(L), [E | permutation(lists:delete(E, L))]).
-
-pushes() -> proper_types:list({push, proper_types:integer()}).
-
-run_commands(_Q, _Popper, []) ->
-    true;
-run_commands(Q, Popper, [{push, X} | T]) ->
-    sel_async_queue:push(Q, X),
-    run_commands(Q, Popper, T);
-run_commands(Q, Popper, [pop | T]) ->
-    Popper ! pop,
-    run_commands(Q, Popper, T).
-
+%%%--------------------------------------------------------------------
+%%% Properties
+%%%--------------------------------------------------------------------
 prop_sequencing() ->
     ?FORALL(
        Comms, commands(),
        ?TRAPEXIT(
           begin
               Q = sel_async_queue:new(),
-              Popper = spawn_link(fun() -> popper(Q) end),
+              Popper = start_popper(Q),
+
               run_commands(Q, Popper, Comms),
+
               Pushes = [X || {push, X} <- Comms],
               Pops = collect_pops(Popper),
+
               proper:equals(Pushes, Pops)
           end)).
+
+%%%--------------------------------------------------------------------
+%%% Generators
+%%%--------------------------------------------------------------------
+commands() ->
+    ?LET(
+       Pushes, pushes(),
+       permutation(Pushes ++ lists:duplicate(length(Pushes), pop))).
+
+pushes() -> proper_types:list({push, proper_types:integer()}).
+
+permutation([]) -> [];
+permutation(L) ->
+    ?LET(E, proper_types:elements(L), [E | permutation(lists:delete(E, L))]).
+
+%%%--------------------------------------------------------------------
+%%% Auxiliary functions
+%%%--------------------------------------------------------------------
+run_commands(Q, Popper, Commands) ->
+    lists:foreach(
+      fun(X) -> run_command(Q, Popper, X) end,
+      Commands).
+
+run_command(Q, _Popper, {push, X}) -> sel_async_queue:push(Q, X);
+run_command(_Q, Popper, pop)      -> Popper ! pop.
 
 collect_pops(Popper) ->
     Popper ! {get_elements, self()},
@@ -68,13 +81,16 @@ collect_pops(Popper) ->
     after 100 -> erlang:error(timeout)
     end.
 
-popper(Q) ->
-    popper(Q, []).
+start_popper(Q) -> spawn_link(fun() -> popper(Q) end).
+
+popper(Q) -> popper(Q, []).
 
 popper(Q, Acc) ->
     receive
         pop ->
-            popper(Q, [sel_async_queue:pop(Q) | Acc]);
+            Element = sel_async_queue:pop(Q),
+            popper(Q, [Element | Acc]);
+
         {get_elements, Pid} ->
             Pid ! {elements, lists:reverse(Acc)}
     end.

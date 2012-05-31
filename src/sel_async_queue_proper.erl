@@ -41,8 +41,9 @@ prop_sequencing() ->
           begin
               Q = sel_async_queue:new(),
               Popper = start_popper(Q),
+              Pusher = start_pusher(Q),
 
-              run_commands(Q, Popper, Comms),
+              run_commands(Popper, Pusher, Comms),
 
               Pushes = [X || {push, X} <- Comms],
               Pops = collect_pops(Popper),
@@ -67,13 +68,21 @@ permutation(L) ->
 %%%--------------------------------------------------------------------
 %%% Auxiliary functions
 %%%--------------------------------------------------------------------
-run_commands(Q, Popper, Commands) ->
+run_commands(Popper, Pusher, Commands) ->
     lists:foreach(
-      fun(X) -> run_command(Q, Popper, X) end,
+      fun(X) ->
+              issue_command(Popper, Pusher, X),
+
+              %% If we don't yield the scheduler will likely allow this process
+              %% to run more reductions, so effectively it may fill the
+              %% mailboxes of the pusher and the popper and then yielding to one
+              %% of them, so we may end up testing only suspended or unsuspended
+              %% queues depending on the scheduling algorithm
+              erlang:yield() end,
       Commands).
 
-run_command(Q, _Popper, {push, X}) -> sel_async_queue:push(Q, X);
-run_command(_Q, Popper, pop)      -> Popper ! pop.
+issue_command(_Popper, Pusher, {push, X}) -> Pusher ! {push, X};
+issue_command(Popper, _Pusher, pop)       -> Popper ! pop.
 
 collect_pops(Popper) ->
     Popper ! {get_elements, self()},
@@ -93,4 +102,16 @@ popper(Q, Acc) ->
 
         {get_elements, Pid} ->
             Pid ! {elements, lists:reverse(Acc)}
+    end.
+
+%% The pusher is not strictly needed, but is easier to control the interleaving
+%% of pops and pushes if both are issued from their own processes
+start_pusher(Q) ->
+    spawn_link(fun() -> pusher(Q) end).
+
+pusher(Q) ->
+    receive
+        {push, Element} ->
+            sel_async_queue:push(Q, Element),
+            pusher(Q)
     end.

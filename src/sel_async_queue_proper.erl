@@ -30,8 +30,15 @@
 -include_lib("proper/include/proper.hrl").
 
 commands() ->
-    proper_types:list(
-      proper_types:elements([{push, proper_types:integer()} , pop])).
+    ?LET(
+       Pushes, pushes(),
+       permutation(Pushes ++ lists:duplicate(length(Pushes), pop))).
+
+permutation([]) -> [];
+permutation(L) ->
+    ?LET(E, proper_types:elements(L), [E | permutation(lists:delete(E, L))]).
+
+pushes() -> proper_types:list({push, proper_types:integer()}).
 
 run_commands(_Q, _Popper, []) ->
     true;
@@ -67,7 +74,7 @@ popper(Q) ->
 popper(Q, Acc) ->
     receive
         pop ->
-            popper([sel_async_queue:pop(Q) | Acc]);
+            popper(Q, [sel_async_queue:pop(Q) | Acc]);
         {get_elements, Pid} ->
             Pid ! {elements, lists:reverse(Acc)}
     end.

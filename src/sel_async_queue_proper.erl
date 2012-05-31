@@ -33,42 +33,41 @@ commands() ->
     proper_types:list(
       proper_types:elements([{push, proper_types:integer()} , pop])).
 
-run_commands(_Q, []) ->
+run_commands(_Q, _Popper, []) ->
     true;
-run_commands(Q, [{push, X} | T]) ->
-    %% we don't push in this process because it creates an asymmetry on
-    %% tests. If we did that in practice sequences like [pop, {push, 0}] are
-    %% very likely to succeed in an implementation that hangs forever if you try
-    %% to pop an empty queue
-    spawn_link(fun() -> sel_async_queue:push(Q, X) end),
-    run_commands(Q, T);
-run_commands(Q, [pop | T]) ->
-    Self = self(),
-    %% Shamefully using the length of the tail as sorting index because I'm too
-    %% lazy to add a new argument to this recursion
-    spawn_link(fun() -> Self ! {popped, sel_async_queue:pop(Q), length(T)} end),
-    run_commands(Q, T).
+run_commands(Q, Popper, [{push, X} | T]) ->
+    sel_async_queue:push(Q, X),
+    run_commands(Q, Popper, T);
+run_commands(Q, Popper, [pop | T]) ->
+    Popper ! pop,
+    run_commands(Q, Popper, T).
 
 prop_sequencing() ->
     ?FORALL(
        Comms, commands(),
        ?TRAPEXIT(
           begin
-              run_commands(sel_async_queue:new(), Comms),
+              Q = sel_async_queue:new(),
+              Popper = spawn_link(fun() -> popper(Q) end),
+              run_commands(Q, Popper, Comms),
               Pushes = [X || {push, X} <- Comms],
-              NumberOfPops = length([x || pop <- Comms]),
-              Items = lists:min([length(Pushes), NumberOfPops]),
-              Pops = collect_pops(Items),
-              proper:equals(lists:sublist(Pushes, Items), Pops)
+              Pops = collect_pops(Popper),
+              proper:equals(Pushes, Pops)
           end)).
 
-collect_pops(N) ->
-    Acc = collect_pops(N, []),
-    [X || {X, _N} <- lists:reverse(lists:keysort(2, Acc))].
-
-collect_pops(0, Acc) ->
-    Acc;
-collect_pops(N, Acc) ->
-    receive {popped, X, Pos} -> collect_pops(N - 1, [{X, Pos} | Acc])
+collect_pops(Popper) ->
+    Popper ! {get_elements, self()},
+    receive {elements, Elements} -> Elements
     after 100 -> erlang:error(timeout)
+    end.
+
+popper(Q) ->
+    popper(Q, []).
+
+popper(Q, Acc) ->
+    receive
+        pop ->
+            popper([sel_async_queue:pop(Q) | Acc]);
+        {get_elements, Pid} ->
+            Pid ! {elements, lists:reverse(Acc)}
     end.

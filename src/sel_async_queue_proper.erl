@@ -34,6 +34,11 @@
 %%%--------------------------------------------------------------------
 %%% Properties
 %%%--------------------------------------------------------------------
+
+%% @doc Test that the elements are popped in the same order as pushed
+%%
+%% This test creates two processes, one to push and other to pop, so that it can
+%% check that the order is correct even when pops precede pushes
 prop_sequencing() ->
     ?FORALL(
        Comms, commands(),

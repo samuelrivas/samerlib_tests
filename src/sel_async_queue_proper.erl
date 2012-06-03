@@ -42,13 +42,17 @@ prop_sequencing() ->
               Q = sel_async_queue:new(),
               Popper = start_popper(Q),
               Pusher = start_pusher(Q),
+              try
+                  run_commands(Popper, Pusher, Comms),
 
-              run_commands(Popper, Pusher, Comms),
+                  Pushes = [X || {push, X} <- Comms],
+                  Pops = collect_pops(Popper),
 
-              Pushes = [X || {push, X} <- Comms],
-              Pops = collect_pops(Popper),
-
-              proper:equals(Pushes, Pops)
+                  proper:equals(Pushes, Pops)
+              after
+                  sel_async_queue:destroy(Q),
+                  stop_processes([Pusher, Popper])
+              end
           end)).
 
 %%%--------------------------------------------------------------------
@@ -61,6 +65,8 @@ commands() ->
 
 pushes() -> proper_types:list({push, proper_types:integer()}).
 
+%% TODO: this generator must be moved to a generic place. This is waiting for
+%% story 30507175 to be completed
 permutation([]) -> [];
 permutation(L) ->
     ?LET(E, proper_types:elements(L), [E | permutation(lists:delete(E, L))]).
@@ -115,3 +121,8 @@ pusher(Q) ->
             sel_async_queue:push(Q, Element),
             pusher(Q)
     end.
+
+stop_processes(Pids) ->
+    lists:foreach(
+      fun(Pid) -> exit(Pid, kill) end,
+      Pids).

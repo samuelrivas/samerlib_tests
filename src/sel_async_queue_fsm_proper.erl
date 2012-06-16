@@ -73,11 +73,11 @@ postcondition(
   _From,_To,_StateData,_Call, _Res) ->
     false.
 
-next_state_data(no_queue, empty, State, _Call, Res) ->
+next_state_data(no_queue, empty, State, Res, _Call) ->
     State#state{queue = Res};
-next_state_data(_, no_queue, State, _Call, _Res) ->
+next_state_data(_, no_queue, State, _Res, _Call) ->
     State#state{queue = undefined};
-next_state_data(_From, _Target, State, _Call, _Res) -> State.
+next_state_data(_From, _Target, State, _Res, _Call) -> State.
 
 %%%===================================================================
 %%% States
@@ -89,7 +89,7 @@ no_queue(#state{queue = Queue}) ->
     ].
 
 empty(#state{queue = Queue}) ->
-    [{no_queue, {call, sel_async_queue, destroy, [Queue]}}].
+    [{no_queue, {call, ?MODULE, destroy, [Queue]}}].
 
 %%%===================================================================
 %%% Transitions

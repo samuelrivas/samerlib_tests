@@ -46,7 +46,7 @@
 -export([no_queue/1, empty/1]).
 
 %%% Transitions
--export([]).
+-export([destroy/1]).
 
 %%%===================================================================
 %%% FSM Callbacks
@@ -54,16 +54,24 @@
 
 initial_state() -> no_queue.
 
-initial_state_data() -> #state{}.
+initial_state_data() -> #state{queue = undefined}.
 
 weight(_,_,_) -> 1.
 
 precondition(_From, _To, _StateData, _Call) -> true.
 
-postcondition(_From, empty,_StateData,_Call, _Res) -> true;
-postcondition(_From, no_queue, StateData,_Call, _Res) ->
+postcondition(
+  no_queue, no_queue, _StateData, {call, _, destroy, [Queue]}, Res) ->
+    Res =:= {error, {invalid_queue, Queue}};
+postcondition(
+  _From, no_queue, StateData, _Call, _Res) ->
     is_queue_down(StateData#state.queue);
-postcondition(_From,_To,_StateData,_Call, _Res) -> false.
+postcondition(
+  _From, empty,_StateData,_Call, _Res) ->
+    true;
+postcondition(
+  _From,_To,_StateData,_Call, _Res) ->
+    false.
 
 next_state_data(no_queue, empty, State, _Call, Res) ->
     State#state{queue = Res};
@@ -74,8 +82,11 @@ next_state_data(_From, _Target, State, _Call, _Res) -> State.
 %%%===================================================================
 %%% States
 %%%===================================================================
-no_queue(_) ->
-    [{empty, {call, sel_async_queue, new, []}}].
+no_queue(#state{queue = Queue}) ->
+    [
+     {empty, {call, sel_async_queue, new, []}}
+     , {no_queue, {call, ?MODULE, destroy, [Queue]}}
+    ].
 
 empty(#state{queue = Queue}) ->
     [{no_queue, {call, sel_async_queue, destroy, [Queue]}}].
@@ -83,6 +94,10 @@ empty(#state{queue = Queue}) ->
 %%%===================================================================
 %%% Transitions
 %%%===================================================================
+destroy(Queue) ->
+    try sel_async_queue:destroy(Queue)
+    catch Reason -> {error, Reason}
+    end.
 
 %%%===================================================================
 %%% Properties

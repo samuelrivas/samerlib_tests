@@ -101,9 +101,10 @@ prop_async_queue_fsm() ->
 %%%===================================================================
 report_error(Cmds, H, S, R) ->
     report_history_and_states(Cmds, H, S),
-    report_result(R),
     report_last_state(S),
-    io:format("History: ~p\nState: ~p\nRes: ~p\n",[H,S,R]).
+    report_result(R),
+    %% io:format("History: ~p\nState: ~p\nRes: ~p\n",[H,S,R]).
+    ok.
 
 report_history_and_states(Cmds, History, _States) ->
     lists:foreach(

@@ -36,7 +36,7 @@
 %% We get a valid result when searching for any element in the list
 prop_keysearch_pos() ->
     ?FORALL(
-       L, tuple_list(),
+       L, key_value_list(),
        begin
            Wrong =
                lists:filter(
@@ -51,7 +51,7 @@ prop_keysearch_pos() ->
 %% list
 prop_keysearch_neg() ->
     ?FORALL(
-       L, proper_types:non_empty(tuple_list()),
+       L, proper_types:non_empty(key_value_list()),
        ?FORALL(
           Tuple, external_tuple(L),
           try
@@ -65,10 +65,29 @@ prop_keysearch_neg() ->
 external_tuple(L) ->
     ?SUCHTHAT(T, small_tuple(), not lists:keymember(key(T), 1, L)).
 
+%% zip_prefix zips the longest amount of elements among two lists
+prop_cut_and_zip() ->
+    ?FORALL(
+       {Zipped, Extra},
+       {duplet_list(), int_list()},
+       begin
+           {L1, L2} = lists:unzip(Zipped),
+           proper:conjunction(
+             [{cutting_first_list,
+               proper:equals(Zipped, sel_lists:cut_and_zip(L1 ++ Extra, L2))},
+              {cutting_second_list,
+               proper:equals(Zipped, sel_lists:cut_and_zip(L1, L2 ++ Extra))}])
+       end).
 %%%-------------------------------------------------------------------
 %%% Generators
 %%%-------------------------------------------------------------------
-tuple_list() ->
+duplet_list() ->
+    Int = proper_types:integer(),
+    proper_types:list({Int, Int}).
+
+int_list() -> proper_types:list(proper_types:integer()).
+
+key_value_list() ->
     ?LET(L, proper_types:list(small_tuple()), filter_duplicated_keys(L)).
 
 %% proper_types:tuple() generates huge tuples and has the risk of depleting the

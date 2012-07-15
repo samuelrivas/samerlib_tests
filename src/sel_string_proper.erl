@@ -47,6 +47,13 @@ prop_parse_invalid_hex() ->
            invalid_hex_string -> true
        end).
 
+prop_format_hex_roundtrip() ->
+    ?FORALL(
+       {B, Case}, {proper_types:binary(), letter_case()},
+       proper:equals(
+         B,
+         sel_string:parse_hex(lists:flatten(sel_string:format_hex(B, Case))))).
+
 prop_format_byte() ->
     ?FORALL(
        {Byte, Case}, {proper_types:byte(), letter_case()},

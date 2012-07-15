@@ -49,10 +49,19 @@ prop_parse_invalid_hex() ->
 
 prop_format_hex_roundtrip() ->
     ?FORALL(
-       {B, Case}, {proper_types:binary(), letter_case()},
+       {Bin, Case}, {proper_types:binary(), letter_case()},
        proper:equals(
-         B,
-         sel_string:parse_hex(lists:flatten(sel_string:format_hex(B, Case))))).
+         Bin,
+         sel_string:parse_hex(
+           lists:flatten(
+             sel_string:format_hex(Bin, Case))))).
+
+prop_format_hex_roundtrip_default_is_upper() ->
+    ?FORALL(
+       Bin, proper_types:binary(),
+       lists:all(
+         fun(C) -> not lists:member(C, low_case_hex_chars()) end,
+         lists:flatten(sel_string:format_hex(Bin)))).
 
 prop_format_byte() ->
     ?FORALL(
@@ -61,6 +70,13 @@ prop_format_byte() ->
            Str = sel_string:format_byte(Byte, Case),
            proper:equals(<<Byte>>, sel_string:parse_hex(Str))
        end).
+
+prop_format_byte_default_is_upper() ->
+    ?FORALL(
+       Byte, proper_types:byte(),
+       lists:all(
+         fun(C) -> not lists:member(C, low_case_hex_chars()) end,
+         sel_string:format_byte(Byte))).
 
 %%%-------------------------------------------------------------------
 %%% Generators
@@ -89,3 +105,5 @@ letter_case() -> proper_types:oneof([lower, upper]).
 
 half_hex() ->
     [proper_types:elements(lists:seq($0, $9) ++ lists:seq($a, $f))].
+
+low_case_hex_chars() -> lists:seq($a, $f).

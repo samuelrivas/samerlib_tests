@@ -36,9 +36,8 @@
 %%%_* Properties =======================================================
 
 prop_extended_euclid() ->
-    Int = non_zero_positive_int(),
     ?FORALL(
-       {A, B}, {Int, Int},
+       {A, B}, pair(non_zero_int()),
        begin
            {X, Y} = sel_int:extended_euclid(A, B),
            D = X*A + Y*B,
@@ -65,17 +64,15 @@ prop_integer_division() ->
 
 %%%_* Generators =======================================================
 
-non_zero_positive_int() ->
-    ?SUCHTHAT(N, proper_types:non_neg_integer(), N /= 0).
-
 non_zero_int() ->
     ?SUCHTHAT(N, proper_types:integer(), N /= 0).
 
+pair(Gen) -> {Gen, Gen}.
+
 %%%_* Private Functions ================================================
 
-no_greater_divisor(A, B, Gcd) when Gcd > A; Gcd > B-> false;
 no_greater_divisor(A, B, Gcd) ->
-    Candidates = lists:seq(Gcd + 1, erlang:min(A, B)),
+    Candidates = lists:seq(abs(Gcd) + 1, erlang:min(abs(A), abs(B))),
     not lists:any(
           fun(X) -> (A rem X) =:= 0 andalso (B rem X) =:= 0 end,
           Candidates).

@@ -74,9 +74,29 @@ prop_mod_abs() ->
        begin
            AmodB = sel_int:mod_abs(A, Mod),
            proper:conjunction(
-             [{positive, AmodB >= 0}
-              , {in_range, AmodB < Mod}
-              , {correct, proper:equals(0, (A - AmodB) rem Mod)}])
+             [{correct, proper:equals(0, (A - AmodB) rem Mod)}
+              | mod_number_conditions(AmodB, Mod)])
+       end).
+
+prop_mod_inv() ->
+    ?FORALL(
+       {A, Mod}, invertible_pair(),
+       begin
+           Ainv = sel_int:mod_inv(A, Mod),
+           proper:conjunction(
+             [{inverse, proper:equals(1, sel_int:mod_abs(Ainv * A, Mod))}
+              , {not_zero, Ainv /= 0}
+              | mod_number_conditions(Ainv, Mod)])
+       end).
+
+prop_no_mod_inv() ->
+    ?FORALL(
+       {A, Mod}, {proper_types:integer(), proper_types:pos_integer()},
+       try sel_int:mod_inv(A, Mod) of
+           _ -> true
+       catch
+           {no_inverse, {A, mod, Mod}} ->
+               sel_int:gcd(A, Mod) /= 1 orelse sel_int:mod_abs(A, Mod) =:= 0
        end).
 
 %%%_* Generators =======================================================
@@ -85,6 +105,11 @@ non_zero_int() ->
     ?SUCHTHAT(N, proper_types:integer(), N /= 0).
 
 pair(Gen) -> {Gen, Gen}.
+
+invertible_pair() ->
+    ?SUCHTHAT(
+       {A, B}, {proper_types:integer(), proper_types:pos_integer()},
+       A rem B /= 0 andalso sel_int:gcd(A, B) =:= 1).
 
 %%%_* Private Functions ================================================
 
@@ -99,6 +124,10 @@ no_greater_divisor(A, B, Gcd) ->
     not lists:any(
           fun(X) -> (A rem X) =:= 0 andalso (B rem X) =:= 0 end,
           Candidates).
+
+mod_number_conditions(N, Mod) ->
+    [{positive, N >= 0}
+     , {in_range, N < Mod}].
 
 %%%_* Emacs ============================================================
 %%% Local Variables:

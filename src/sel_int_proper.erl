@@ -44,9 +44,7 @@ prop_extended_euclid() ->
            proper:conjunction(
              [{integer_x, is_integer(X)}
               , {integer_y, is_integer(Y)}
-              , {divides_a, proper:equals(0, A rem D)}
-              , {divides_b, proper:equals(0, B rem D)}
-              , {no_greater_divisor, no_greater_divisor(A, B, D)}])
+              | gcd_conditions(A, B, D)])
        end).
 
 prop_integer_division() ->
@@ -62,6 +60,14 @@ prop_integer_division() ->
               , {sign_r, R*A >= 0}])
        end).
 
+prop_gcd() ->
+    ?FORALL(
+       {A, B}, pair(non_zero_int()),
+       begin
+           Gcd = sel_int:gcd(A, B),
+           proper:conjunction(gcd_conditions(A, B, Gcd))
+       end).
+
 %%%_* Generators =======================================================
 
 non_zero_int() ->
@@ -70,6 +76,12 @@ non_zero_int() ->
 pair(Gen) -> {Gen, Gen}.
 
 %%%_* Private Functions ================================================
+
+gcd_conditions(A, B, Gcd) ->
+      [{integer, is_integer(Gcd)}
+       , {divides_a, proper:equals(0, A rem Gcd)}
+       , {divides_b, proper:equals(0, B rem Gcd)}
+       , {no_greater_divisor, no_greater_divisor(A, B, Gcd)}].
 
 no_greater_divisor(A, B, Gcd) ->
     Candidates = lists:seq(abs(Gcd) + 1, erlang:min(abs(A), abs(B))),

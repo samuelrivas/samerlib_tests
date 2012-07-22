@@ -68,6 +68,17 @@ prop_gcd() ->
            proper:conjunction(gcd_conditions(A, B, Gcd))
        end).
 
+prop_mod_abs() ->
+    ?FORALL(
+       {A, Mod}, {proper_types:integer(), proper_types:pos_integer()},
+       begin
+           AmodB = sel_int:mod_abs(A, Mod),
+           proper:conjunction(
+             [{positive, AmodB >= 0}
+              , {in_range, AmodB < Mod}
+              , {correct, proper:equals(0, (A - AmodB) rem Mod)}])
+       end).
+
 %%%_* Generators =======================================================
 
 non_zero_int() ->

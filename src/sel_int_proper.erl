@@ -99,6 +99,20 @@ prop_no_mod_inv() ->
                sel_int:gcd(A, Mod) /= 1 orelse sel_int:mod_abs(A, Mod) =:= 0
        end).
 
+prop_sqrt() ->
+    ?FORALL(
+       N, proper_types:pos_integer(),
+       begin
+           {Min, Max} = sel_int:sqrt(N),
+           proper:conjunction(
+             [{diff, Max - Min =< 1}
+              , {positive_max, Max >= 0}
+              , {positive_min, Min >= 0}
+              , {max, Max * Max >= N}
+              , {min, Min * Min =< N}
+             ])
+       end).
+
 %%%_* Generators =======================================================
 
 non_zero_int() ->
